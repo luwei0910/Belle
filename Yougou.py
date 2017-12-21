@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
 import numpy as np
+import os
 
 channel = "TB"
 channel_CN = "淘宝"
@@ -9,8 +10,14 @@ online_sales_data_file = "E:/Belle/ST_" + channel + ".csv"
 online_sales_data = pd.read_csv(online_sales_data_file, encoding='gbk')
 online_category_data = "E:/Belle/思加图商品属性.xlsx"
 category_data = pd.read_excel(online_category_data, encoding='gbk')
-plot_path = "E:/Belle/Plots/ST_" + channel + "/"
-
+plot_path = "E:/Belle/Plots/ST/" + channel + "/"
+plot_path1 = plot_path + "Exclude_Peak/"
+plot_path2 = plot_path + "Include_Peak/"
+if not os.path.exists(plot_path1):
+    os.makedirs(plot_path1)
+if not os.path.exists(plot_path2):
+    os.makedirs(plot_path2)
+    
 ### 预处理 ###
 # 到手价指记入优惠券提供的优惠并扣除礼品卡抵扣的金额后单品的价格
 sale_category_merge_full = pd.merge(online_sales_data, category_data, how='left', left_on='商品编码', right_on='商品编号', suffixes=['','_1'])
@@ -86,19 +93,23 @@ for class3 in pivot_array.keys():
         # 除去成交件数大于3倍75%百分点值的outlier并计算outlier占比
         quartile3 = pivot_array[class3][top_n][0]['成交件数'].describe()[6]
         cnt_sum = np.sum(pivot_array[class3][top_n][0]['成交件数'])
-        normal = pivot_array[class3][top_n][0]
+        include_peak = pivot_array[class3][top_n][0]
         peak = pivot_array[class3][top_n][0][pivot_array[class3][top_n][0]['成交件数'] > quartile3*3]
         peak_cnt_sum = np.sum(peak['成交件数'])
         peak_pct = round(peak_cnt_sum / cnt_sum * 100, 1)
         plot_title = pivot_array[class3][top_n][1] + ' 峰值占比' + str(peak_pct) + '%'
-        nonpeak = pivot_array[class3][top_n][0][pivot_array[class3][top_n][0]['成交件数'] <= quartile3*3]
+        exclude_peak = pivot_array[class3][top_n][0][pivot_array[class3][top_n][0]['成交件数'] <= quartile3*3]
         # 加总到周Level
         week_list= pd.date_range(start="2017-01-01",end="2017-12-31",freq='W')
-        week_agg = {}
+        week_agg_exclude_peak = {}
+        week_agg_include_peak = {}
         for week_number in range(len(week_list)-1):
             week_start = week_list[week_number]
             week_end = week_list[week_number + 1]
-            week_agg[week_start] = int(np.sum(nonpeak['成交件数'][(nonpeak.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (nonpeak.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))]))
-        plots = pd.DataFrame(pd.Series(week_agg)).plot(title=plot_title, legend=False, fontsize=14, figsize=(10,6))
-        plots.get_figure().savefig(plot_path + plot_title + ".png")
+            week_agg_exclude_peak[week_start] = int(np.sum(exclude_peak['成交件数'][(exclude_peak.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (exclude_peak.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))]))
+            week_agg_include_peak[week_start] = int(np.sum(include_peak['成交件数'][(include_peak.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (include_peak.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))]))
+        plots_exclude_peak = pd.DataFrame(pd.Series(week_agg_exclude_peak)).plot(title=plot_title, legend=False, fontsize=14, figsize=(10,6))
+        plots_exclude_peak.get_figure().savefig(plot_path1 + plot_title + ".png")
+        plots_include_peak = pd.DataFrame(pd.Series(week_agg_include_peak)).plot(title=plot_title, legend=False, fontsize=14, figsize=(10,6))
+        plots_include_peak.get_figure().savefig(plot_path2 + plot_title + ".png")
         #pivot_array[class3][top_n][0].plot(subplots=True, title=pivot_array[class3][top_n][1])
