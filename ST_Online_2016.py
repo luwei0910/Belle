@@ -7,14 +7,12 @@ import datetime
 channel = "TB"
 channel_CN = "淘宝"
 season = "17年春季"
-online_sales_data_file = "E:/Belle/ST_" + channel + ".csv"
+online_sales_data_file = "E:/Belle/Staccato/ST_" + channel + "_2017.csv"
 online_sales_data = pd.read_csv(online_sales_data_file, encoding='gbk')
-offline_sales_data = pd.read_csv("E:/Belle/ST_sku_20171214v1.csv")
-offline_sales_trim = offline_sales_data[['pmt_sku_ss.inv_date', 'pmt_sku_ss.product_code', 'pmt_sku_ss.qty', 'pmt_sku_ss.amount', 'pmt_sku_ss.tag_amount']]
-offline_sales_trim = offline_sales_trim[offline_sales_trim['pmt_sku_ss.amount'].notnull()]
-offline_sales_trim['线下到手价'] = round(offline_sales_trim['pmt_sku_ss.amount'] / offline_sales_trim['pmt_sku_ss.qty'])
-category_data = pd.read_excel("E:/Belle/思加图商品属性.xlsx", encoding='gbk')
-tag_data = pd.read_excel("E:/Belle/Product_Tag/17春产品标签.xlsx", sheet_name="2017春")
+category_data = pd.read_excel("E:/Belle/Staccato/思加图商品属性.xlsx", encoding='gbk')
+tag_data = pd.read_excel("E:/Belle/Product_Tag/17春产品标签.xlsx", sheet_name="产品的属性")
+cal = pd.read_excel("E:/Belle/活动日历/天猫161718活动/1617年活动明细-staccato旗舰店.xlsx", sheetname="17年", skiprows=[0])
+fest_cal = cal[cal['行为名称（短名）'] != "日销"]
 tag_data.loc[tag_data['款型'] == '满帮', '款型'] = '满帮鞋'
 tag_data.loc[tag_data['款型'] == '浅口', '款型'] = '浅口鞋'
 tag_data.loc[tag_data['款型'] == '中空', '款型'] = '中空凉鞋'
@@ -23,6 +21,7 @@ tag_data.loc[tag_data['款型'] == '前空', '款型'] = '鱼嘴鞋'
 plot_path = "E:/Belle/Plots/ST/" + channel + "/"
 plot_path1 = plot_path + "Exclude_Peak/"
 plot_path2 = plot_path + "Original/"
+plot_path3 = plot_path + "Peak/"
 if not os.path.exists(plot_path1):
     os.makedirs(plot_path1)
 if not os.path.exists(plot_path2):
@@ -33,7 +32,7 @@ if not os.path.exists(plot_path2):
 sale_category_merge_full = pd.merge(online_sales_data, category_data, how='left', left_on='商品编码', right_on='商品编号', suffixes=['','_1'])
 sale_category_merge = sale_category_merge_full[['日期','供应商款色编号','商品编码','品牌名称','一级分类','二级分类','三级分类','成交金额','成交件数','牌价','促销活动金额','商品优惠总金额','优惠券金额','礼品卡金额','运费均摊','省','市','商品销售季']]
 
-# 仅分析2017年春季款
+# 仅分析2016年春季款
 intermediate_master = sale_category_merge[sale_category_merge['商品销售季'] == season]
 data = pd.merge(intermediate_master, tag_data, how='left', left_on='供应商款色编号', right_on='货号', suffixes=['','_1'])
 data['营收金额'] = data['成交金额'] + data ['礼品卡金额']
@@ -51,7 +50,9 @@ data_kid = data_clean[data_clean['一级分类'] == '童鞋']
 
 ### 报表 ###
 pivot_women_cnt = pd.pivot_table(data_women, values='成交件数', index='日期', aggfunc=np.sum)
+#pivot_men_amt = pd.pivot_table(data_men, values='营收金额',  index='日期', aggfunc=np.sum)
 pivot_women_dscnt = pd.pivot_table(data_women, values='折扣',  index='日期')
+#pivot_men_dscnt = pd.pivot_table(data_men, values='折扣',  index='日期')
 pivot_women_combine = pd.concat([pivot_women_cnt,pivot_women_dscnt],axis=1)
 
 # 按销量计算线上活动日期
@@ -96,7 +97,7 @@ for pid in women_cnt_by_pid.index:
     pivot_by_pid = pd.concat([pivot_amt_by_pid,pivot_price_by_pid,pivot_dscnt_by_pid], axis=1)
 
     # 找出各品类销量TOP5的
-    if len(pivot_array[class3]) < 100:
+    if len(pivot_array[class3]) < 10:
         pivot_array[class3].append([pivot_by_pid,title_str])
     else: 
         pivot_array_full_ind[class3] = True
@@ -105,71 +106,88 @@ for pid in women_cnt_by_pid.index:
     break  
 
 # 定义活动日期
-peak_dates_list = ['2017-02-20','2017-03-06','2017-03-07','2017-03-08','2017-03-21','2017-03-31','2017-04-14','2017-04-15','2017-04-21','2017-04-22','2017-05-02','2017-05-03','2017-05-17','2017-05-18','2017-06-06','2017-06-18','2017-06-19','2017-06-20','2017-07-11','2017-07-21','2017-07-31','2017-08-11','2017-08-05','2017-08-27','2017-09-09','2017-09-10','2017-11-11']
-major_fest_list = ['2017-03-06','2017-03-07','2017-03-08','2017-06-18','2017-06-19','2017-06-20','2017-11-11']
+peak_dates_list = []
+for date in fest_cal['活动时间']:
+    as_date = datetime.datetime.strptime(date, "%Y.%m.%d")
+    actual_date = datetime.datetime.strftime(as_date, "%Y-%m-%d")
+    peak_dates_list.append(actual_date)
+#peak_dates_list = ['2016-02-20','2016-03-06','2016-03-07','2016-03-08','2016-03-21','2016-03-31','2016-04-14','2016-04-15','2016-04-21','2016-04-22','2016-05-02','2016-05-03','2016-05-17','2016-05-18','2016-06-06','2016-06-18','2016-06-19','2016-06-20','2016-07-11','2016-07-21','2016-07-31','2016-08-11','2016-08-05','2016-08-27','2016-09-09','2016-09-10','2016-11-11']
+major_fest_list = ['2016-03-06','2016-03-07','2016-03-08','2016-06-18','2016-06-19','2016-06-20','2016-11-11']
 
 ### 分析不同类别销量排名Top的款型
 peak_influence_df = pd.DataFrame(columns=['款型','日期','活动影响因子'])
 for class3 in pivot_array.keys():
     for top_n in range(len(pivot_array[class3])):
+        tmp = pd.DataFrame(columns=['成交件数','到手价','折扣'])
         original = pivot_array[class3][top_n][0]
         cnt_sum = np.sum(original['成交件数'])
+        i = 0
+        for idx in original.index:
+            if idx in peak_dates_list:
+                tmp = tmp.append(original.iloc[i])
+            i += 1
+        original = tmp['成交件数']
+        original = pd.DataFrame(pd.Series(original))
+        plot_title = pivot_array[class3][top_n][1]
+#        plots_original = original.plot(title=plot_title, legend=False, fontsize=14, figsize=(11,6))
+#        plots_original.get_figure().savefig(plot_path3 + plot_title + ".png")
         # 除去成交件数大于3倍75%百分点值的outlier并计算outlier占比
         #quartile3 = original['成交件数'].describe()[6]
         #peak = original[original['成交件数'] > quartile3*3]
         #exclude_peak = original[original['成交件数'] <= quartile3*2.5]
-        exclude_peak = original.copy()
-        peak = pd.DataFrame(columns = ['成交件数','到手价','折扣'])
-        fest = pd.DataFrame(columns = ['成交件数','到手价','折扣'])
-        for date in original.index:
-            if date in peak_dates_list:
-                sum = 0
-                non_peak_day_cnt = 0
-                peak = peak.append(original.loc[date,:])
-                if date in major_fest_list:
-                    fest = fest.append(original.loc[date,:])
-                peak_day = datetime.datetime.strptime(date,'%Y-%m-%d')            
-                for day_diff in range(-6,7):
-                    day = datetime.datetime.strftime(peak_day + datetime.timedelta(days = day_diff), '%Y-%m-%d')
-                    if (day not in peak_dates_list):
-                        non_peak_day_cnt += 1
-                        if day in original.index:
-                            sum += original.loc[day,'成交件数']
-                exclude_peak.loc[date,'成交件数'] = round(np.average(sum/non_peak_day_cnt))
-        peak_cnt_sum = np.sum(peak['成交件数'])
-        peak_pct = round(peak_cnt_sum / cnt_sum * 100, 1)
-        plot_title = pivot_array[class3][top_n][1] + ' 峰值占比' + str(peak_pct) + '%'
-        fest_cnt_sum = np.sum(fest['成交件数'])
-        fest_pct = round(fest_cnt_sum / cnt_sum * 100, 1)
-        plot_title = plot_title + ' 三大节占比' + str(fest_pct) + '%'
+#        exclude_peak = original.copy()
+#        peak = pd.DataFrame(columns = ['成交件数','到手价','折扣'])
+#        fest = pd.DataFrame(columns = ['成交件数','到手价','折扣'])
+#        for date in original.index:
+#            if date in peak_dates_list:
+#                sum = 0
+#                non_peak_day_cnt = 0
+#                peak = peak.append(original.loc[date,:])
+#                if date in major_fest_list:
+#                    fest = fest.append(original.loc[date,:])
+#                peak_day = datetime.datetime.strptime(date,'%Y-%m-%d')            
+#                for day_diff in range(-6,7):
+#                    day = datetime.datetime.strftime(peak_day + datetime.timedelta(days = day_diff), '%Y-%m-%d')
+#                    if (day not in peak_dates_list):
+#                        non_peak_day_cnt += 1
+#                        if day in original.index:
+#                            sum += original.loc[day,'成交件数']
+##                exclude_peak.loc[date,'成交件数'] = round(np.average(sum/non_peak_day_cnt))
+#        peak_cnt_sum = np.sum(peak['成交件数'])
+#        peak_pct = round(peak_cnt_sum / cnt_sum * 100, 1)
+#        plot_title = pivot_array[class3][top_n][1] + ' 峰值占比' + str(peak_pct) + '%'
+#        fest_cnt_sum = np.sum(fest['成交件数'])
+#        fest_pct = round(fest_cnt_sum / cnt_sum * 100, 1)
+#        plot_title = plot_title + ' 三大节占比' + str(fest_pct) + '%'
         
-        # 加总到周Level
-        week_list= pd.date_range(start="2017-01-01",end="2017-12-31",freq='MS')
+        # 设定粒度（周/双周/月）
+        week_list= pd.date_range(start="2017-01-01",end="2017-12-31",freq='W')[::2]
         week_agg_exclude_peak = {}
         week_agg_original = {}
         week_avg_dscnt = {}
         for week_number in range(len(week_list)-1):
             week_start = week_list[week_number]
             week_end = week_list[week_number + 1]
-            week_avg_dscnt[week_start] = (np.average(original['折扣'][(original.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (original.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))])) * 10 # 单位：折
+#            week_avg_dscnt[week_start] = (np.average(original['折扣'][(original.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (original.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))]))  * 10 # 单位：折
             week_agg_original[week_start] = int(np.sum(original['成交件数'][(original.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (original.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))]))
-            week_agg_exclude_peak[week_start] = int(np.sum(exclude_peak['成交件数'][(exclude_peak.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (exclude_peak.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))]))
-        week_agg_dscnt_df = pd.DataFrame(pd.Series(week_avg_dscnt))    
-        week_agg_dscnt_df.fillna(method='pad', inplace=True) # 用前一项填补折扣空缺值
+#            week_agg_exclude_peak[week_start] = int(np.sum(exclude_peak['成交件数'][(exclude_peak.index >= week_start.to_pydatetime().strftime('%Y-%m-%d')) & (exclude_peak.index < week_end.to_pydatetime().strftime('%Y-%m-%d'))]))
+#        week_agg_dscnt_df = pd.DataFrame(pd.Series(week_avg_dscnt))    
+#        week_agg_dscnt_df.fillna(method='pad', inplace=True) # 用前一项填补折扣空缺值
         week_agg_original_df = pd.DataFrame(pd.Series(week_agg_original))
-        week_agg_exclude_peak_df = pd.DataFrame(pd.Series(week_agg_exclude_peak))
+
+#        week_agg_exclude_peak_df = pd.DataFrame(pd.Series(week_agg_exclude_peak))
 # 绘制曲线
-#        plots_original = week_agg_original_df.plot(title=plot_title, legend=False, fontsize=14, figsize=(10,6))
-#        plots_original.get_figure().savefig(plot_path2 + plot_title + ".png")
+        plots_original = week_agg_original_df.plot(title=plot_title, legend=False, fontsize=14, figsize=(10,6), xticks=week_list)
+        plots_original.get_figure().savefig(plot_path3 + plot_title + ".png")
 #        plots_exclude_peak = week_agg_exclude_peak_df.plot(title=plot_title, legend=False, fontsize=14, figsize=(10,6))
 #        plots_exclude_peak.get_figure().savefig(plot_path1 + plot_title + ".png")
-        peak_diff = original['成交件数'] - exclude_peak['成交件数']
-        exclude_peak_impute = exclude_peak['成交件数']
-        exclude_peak_impute[exclude_peak_impute == 0] = 1
-        peak_influence = peak_diff / exclude_peak_impute
-        peak_influence.columns = top_n
-        for i in range(len(peak_influence)):
-            peak_influence_df.loc[peak_influence_df.shape[0]+1] = [class3, peak_influence.index[i], peak_influence[i]]
+#        peak_diff = original['成交件数'] - exclude_peak['成交件数']
+#        exclude_peak_impute = exclude_peak['成交件数']
+#        exclude_peak_impute[exclude_peak_impute == 0] = 1
+#        peak_influence = peak_diff / exclude_peak_impute
+#        peak_influence.columns = top_n
+#        for i in range(len(peak_influence)):
+#            peak_influence_df.loc[peak_influence_df.shape[0]+1] = [class3, peak_influence.index[i], peak_influence[i]]
 #        week_dscnt_cnt = pd.concat([week_agg_exclude_peak_df,week_agg_dscnt_df], axis = 1)
 #        week_dscnt_cnt.columns = ['成交件数', '折扣']
 #        plots_exclude_peak = week_dscnt_cnt.plot(title=plot_title, legend=False, fontsize=14, figsize=(10,6), subplots=True)
